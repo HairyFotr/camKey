@@ -29,7 +29,10 @@ object camKey extends App {
             cam.start
             Some(cam)
         } catch { 
-            case e:Throwable => None 
+            case e:Throwable => 
+            e.printStackTrace
+            sys.exit(-1)
+            None 
         }
         
     val cam = getCamera(0).get

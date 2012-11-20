@@ -1,0 +1,9 @@
+--------
+ camKey
+--------
+
+Just a fun experiment - using the camera to control a game (e.g. https://github.com/Psywerx/game-off-2012)
+When you move left or right, the program generates key presses and mouse movements.
+
+Libraries used:
+    JavaCV - http://code.google.com/p/javacv/

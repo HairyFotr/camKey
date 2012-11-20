@@ -1,0 +1,5 @@
+jars() { for j in *.jar; do echo -n $j:; done; }
+
+mkdir bin &> /dev/null
+app="cameraControl"
+scalac -d bin -cp `jars` $app.scala && scala -cp bin:`jars` $app

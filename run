@@ -2,4 +2,4 @@ jars() { for j in *.jar; do echo -n $j:; done; }
 
 mkdir bin &> /dev/null
 app="`basename $1 .scala`"
-scalac -d bin -cp `jars` $app.scala && scala -cp bin:`jars` $app $2
+scalac -d bin -cp `jars` $app.scala && scala -cp bin:`jars` $app $2 $3 $4 $5 # too lazy to google shuffle, or whatisit :)

@@ -13,13 +13,13 @@ How to install:
         for aaa in /usr/lib/libopencv_*2.3; do sudo ln -s $aaa ${aaa%????}.2.4; done
 
 How to use:
-    ./run camKey
+    ./run camKey # no switches yet :)
     when there is left/right movement, left/right keys are pressed
     
     or
     
-    ./run camMouse
-    hold still while it grabs some frames to see how bad noise is...
+    ./run camMouse # switches: click
+    hold still while it grabs some frames to tune a few parameters...
     movement now controls the mouse
 
 Libraries used:

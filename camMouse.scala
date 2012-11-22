@@ -6,7 +6,7 @@ import Thread.sleep
 import math._
 import collection.mutable.{HashMap,HashSet,ListBuffer,LinkedHashMap}
 import java.awt.{MouseInfo,Robot}
-import java.awt.event.KeyEvent
+import java.awt.event.{KeyEvent,InputEvent}
 import scala.concurrent._
 import scala.concurrent.util._
 import scala.concurrent.duration._
@@ -21,9 +21,12 @@ object camMouse extends App {
         func
         now-startTime
     }
+    def pad(i: Int, p: Int = 4) = "0"*(p-i.toString.size)+i.toString
     val (inf,ninf) = (Double.PositiveInfinity, Double.NegativeInfinity)
     var width = 640
     var height = 480
+    
+    var switches = args.dropWhile(_ matches "[0-9]*").toSet
 
     // init
     def getCamera(i:Int):Option[FrameGrabber] = 
@@ -71,11 +74,15 @@ object camMouse extends App {
     var cnt = 0
     var x0,y0 = 0d
     var xt1,xt2,yt1,yt2,xt,yt = 0d
-    val init = 50
+    var xcnt1,xcnt2 = 0
+    var ecnt1,ecnt2 = 0
+    var cntx0,cnty0 = 0
+    val init = 30
     var noise = List[(Double,Double)]()
     var futurepic = future {}
     val Arange = (0 until 7).toArray
     println("Be still for a few seconds :)")
+    var clickTime = now
     while(true) {
         Await.result(futurepic, Duration.Inf)
         var vectors = for((x,y) <- randPoints) yield {
@@ -127,8 +134,11 @@ object camMouse extends App {
         
         ex = (ex + x)/2
         ey = (ey + y)/2
+        val cnt1 = vectors.map(_._1).count(_ < xt1)-xcnt1
+        val cnt2 = vectors.map(_._1).count(_ > xt2)-xcnt2
+        
         if(cnt < init) {
-            noise = noise :+ (x,y)            
+            noise = noise :+ (x,y)
         } else if(cnt == init) {
             def noiseAvg(m:((Double,Double))=>Double)(f:Double=>Boolean) = { 
                 val n = noise.map(m).filter(f)
@@ -143,20 +153,52 @@ object camMouse extends App {
             yt2 = (noiseAvg(_._2)(_ > y0)-y0)
             xt = min(abs(xt1),abs(xt2))
             yt = min(abs(yt1),abs(yt2))
+            
             println(List(x0,y0,xt1,xt2,yt1,yt2).map(_.toInt).mkString(","))
+            //println("A bit more... :)")
+        } else if(cnt < init*2 && (switches contains "click")) {
+            xcnt1 += vectors.map(_._1).count(_ < xt1)
+            xcnt2 += vectors.map(_._1).count(_ > xt2)
+        } else if(cnt == init*2 && (switches contains "click")) {
+            xcnt1 /= init
+            xcnt2 /= init
+        } else if(cnt == init*2+1) {
             println("Move now :)")
         } else {
+
             val p = MouseInfo.getPointerInfo.getLocation
             val (vx,vy) = (
                 if(ex <= xt1/2 || ex >= xt2/2) (ex - signum(ex)*xt).toInt else 0,
                 if(ey <= yt1/2 || ey >= yt2/2) (ey - signum(ey)*yt).toInt else 0
                 //ex.toInt,ey.toInt
             )
-            robot.mouseMove(p.x+vx, p.y+vy)
+
+            if(switches contains "click") {
+            if(cnt1 >= 1 && cnt2 >= 1 && ecnt1 >= 1 && ecnt2 >= 1 && ecnt1+ecnt2 >= 3 && vy > 0 && since(clickTime) > 700) {
+                println
+                robot.mouseMove(cntx0, cnty0)
+                ex = 0
+                ey = 0
+                robot.mousePress(InputEvent.BUTTON1_MASK)
+                sleep(10)
+                robot.mouseRelease(InputEvent.BUTTON1_MASK)
+                clickTime = now
+                println
+            } else if(cnt1+cnt2 <= 1) {
+                cntx0 = p.x
+                cnty0 = p.y
+            }
+            }
+
+            if(since(clickTime) > 400) {
+                robot.mouseMove(p.x+vx, p.y+vy)
+            }
         }
+        ecnt1 = cnt1
+        ecnt2 = cnt2
 
         cnt += 1
-        print("\r" + (x.toInt,y.toInt) + "                 \t\t\t " + ("%1.2f" format avgTime) + "           \r")
+        print("\r" + (pad(x.toInt),pad(y.toInt)) + (pad(cnt1.toInt),pad(cnt2.toInt)) + "                 \t\t\t " + ("%1.2f" format avgTime) + "           \r")
         avgTime = (since(tick)*0.2d + avgTime*0.8d)
         tick = now
     }

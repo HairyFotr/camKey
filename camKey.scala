@@ -1,152 +1,329 @@
-import com.googlecode.javacv._
-import com.googlecode.javacv.cpp.opencv_core._
-import com.googlecode.javacv.cpp.opencv_highgui._
+import util.Random._
 import Thread.sleep
 import math._
 import collection.mutable.{HashMap,HashSet,ListBuffer,LinkedHashMap}
+import collection.parallel.mutable.ParArray
 import java.awt.{MouseInfo,Robot}
-import java.awt.event.KeyEvent
+import java.awt.event.{KeyEvent,InputEvent}
+import scala.concurrent._
+import scala.concurrent.util._
+import scala.concurrent.duration._
+import ExecutionContext.Implicits.global
+import System.err
+
+object Utils {
+  var timeDivisor = 1000000L
+  def since(time: Int): Int = now-time
+  def now = (System.nanoTime()/timeDivisor).toInt
+  def time(func: => Unit) = {
+    val startTime = now
+    func
+    now-startTime
+  }
+
+  def pad(i: Int, p: Int = 4) = "0"*(p-i.toString.size)+i.toString
+  val (inf,ninf) = (Double.PositiveInfinity, Double.NegativeInfinity)
+
+  def withDefault[T](func: => T, default: T): T = try { func } catch { case _: Throwable => default}
+  def withAlternative[T](func: => T, alternative: => T ): T = try { func } catch { case _: Throwable => alternative}
+  def withExit[T](func: => T, exit: => Any = { }): T = try { func } catch { case _: Throwable => exit; sys.exit(-1) }
+ 
+  import com.googlecode.javacv._
+  import com.googlecode.javacv.cpp.opencv_core._
+  import com.googlecode.javacv.cpp.opencv_highgui._
+  object Camera {
+    val FrameGrabbers = HashMap[Int, OpenCVFrameGrabber]()
+    
+    def getCamera(camIds:List[Int], width: Int = 640, height: Int = 480): Option[Camera] = {
+      for(camId <- camIds) {
+        val out = Camera(camId, width, height)
+        if(out.isStarted) return Some(out)
+      }
+      
+      None
+    }
+
+    
+    def getFrameGrabber(camId: Int = 0, width: Int = 640, height: Int = 480): Option[OpenCVFrameGrabber] = {
+      try {
+        val cam = new OpenCVFrameGrabber(camId) 
+        cam.setImageWidth(width)
+        cam.setImageHeight(width)
+        cam.start
+        cam.grab
+        FrameGrabbers += camId -> cam
+        Some(cam)
+      } catch {
+        case e: Exception => 
+        err.println(s"Failed to initialize camera ${camId} @ ${width}x${height}")
+        None
+      }
+    }
+    def apply(camId: Int = 0, width: Int = 640, height: Int = 480): Camera = {
+      new Camera(camId, width, height)
+    }
+  }
+  class Camera(val camId: Int = 0, val width: Int = 640, val height: Int = 480) {
+    var camOpt: Option[OpenCVFrameGrabber] = Camera.getFrameGrabber(camId, width, height)
+    def isStarted = camOpt.isDefined
+    lazy val cam = camOpt.get
+    lazy val grabRange = (0 until width*height)
+    
+    def captureFrame(pixels:Array[Array[Int]]): Unit = {
+      Option(cam.grab) foreach { img =>
+        val imgData = img.getBufferedImage.getData.getDataBuffer.asInstanceOf[java.awt.image.DataBufferByte] //surely there's an easier way
+        for(i <- grabRange) 
+          pixels(i%width)(i/width) = (
+            imgData.getElem(i*3+0).toInt +
+            imgData.getElem(i*3+1).toInt +
+            imgData.getElem(i*3+2).toInt
+          )
+      }
+    }
+  }
+}
 
 object camKey extends App {
-    var timeDivisor = 1000000L
-    def since(time: Int): Int = now-time
-    def now = (System.nanoTime()/timeDivisor).toInt
-    def time(func: => Unit) = {
-        val startTime = now
-        func
-        now-startTime
-    }
-    val (inf,ninf) = (Double.PositiveInfinity, Double.NegativeInfinity)
-    var width = 640
-    var height = 480
-
-    // init
-    def getCamera(i:Int):Option[FrameGrabber] = 
-        try { 
-            val cam = new OpenCVFrameGrabber(i) 
-            cam.setImageWidth(width)
-            cam.setImageHeight(height)
-            cam.start
-            Some(cam)
-        } catch { 
-            case e:Throwable => 
-            e.printStackTrace
-            println()
-            println("Is the camera on... did you follow the README?")
-            sys.exit(-1)
-            None 
-        }
-        
-    val cam = getCamera(try { args(0).toInt } catch { case e:Exception => 0 }).get
+  import Utils._
+  
+  // parse switches
+  val (cam, modes, actions) = {
+    var camIds = List[Int]()
+    val modes = HashSet[String]()
+    val actions = HashSet[String]()
+    var size = (640,480)
     
-    val imgRange = (0 until width*height)
-    def captureFrame(pixels:Array[Array[Int]]) = {
-        Option(cam.grab) foreach { img =>
-            val imgData = img.getBufferedImage.getData.getDataBuffer.asInstanceOf[java.awt.image.DataBufferByte]
-            for(i <- imgRange) 
-                pixels(i%width)(i/width) = (
-                    imgData.getElem(i*3+0).toInt +
-                    imgData.getElem(i*3+1).toInt +
-                    imgData.getElem(i*3+2).toInt
-                )
-        }
+    if(args exists (_ matches "-?-?help")) {
+      println("""|Usage: -c[CAMID] -m[MODE] -s[WIDTHxHEIGHT] [OPTIONS]
+                 |
+                 |Allows you to control your keyboard or mouse with your camera.
+                 |
+                 |Options info:
+                 |  -mmouse           use mouse
+                 |  -mkeyboard(x|y)   use keyboard, optionally only for x or y
+                 |  -moutput          output to console
+                 |  flip(x|y)         flip axes (useful if moving camera)
+                 |  click             click gesture for mouse mode (WIP)
+                 |
+                 |Note: multiple modes can be used simultaneously""".stripMargin)
+      sys.exit(0)
     }
 
-    val robot = new Robot
-    var avgtime = 0d
-    var ex = 0
-    var pic1 = Array.ofDim[Int](width, height)
-    var pic2 = Array.ofDim[Int](width, height)
-    captureFrame(pic1)
-    captureFrame(pic2)
-    var tick = now
-    while(true) {
-        val edge = 17
-        
-        var gradL1, gradR1, gradL2, gradR2, gradL3, gradR3, gradL4, gradR4, gradL5, gradR5, gradL6, gradR6, gradL7, gradR7,
-            gradDL, gradDR, gradUL, gradUR, gradDL2, gradDR2, gradUL2, gradUR2,
-            gradC = 0
-        for(i <- edge until width-edge; j <- edge until height-edge) {
-            gradL1 += abs(pic1(i)(j) - pic2(i-1)(j))
-            gradL2 += abs(pic1(i)(j) - pic2(i-2)(j))
-            gradL3 += abs(pic1(i)(j) - pic2(i-3)(j))
-            gradL4 += abs(pic1(i)(j) - pic2(i-4)(j))
-            gradL5 += abs(pic1(i)(j) - pic2(i-7)(j))
-            gradL6 += abs(pic1(i)(j) - pic2(i-11)(j))
-            gradL7 += abs(pic1(i)(j) - pic2(i-17)(j))
-            gradC  += abs(pic1(i)(j) - pic2(i)(j))
-            gradR1 += abs(pic1(i)(j) - pic2(i+1)(j))
-            gradR2 += abs(pic1(i)(j) - pic2(i+2)(j))
-            gradR3 += abs(pic1(i)(j) - pic2(i+3)(j))
-            gradR4 += abs(pic1(i)(j) - pic2(i+4)(j))
-            gradR5 += abs(pic1(i)(j) - pic2(i+7)(j))
-            gradR6 += abs(pic1(i)(j) - pic2(i+11)(j))
-            gradR7 += abs(pic1(i)(j) - pic2(i+17)(j))
-            gradUL += abs(pic1(i)(j) - pic2(i-2)(j-1))
-            gradUR += abs(pic1(i)(j) - pic2(i+2)(j-1))
-            gradDL += abs(pic1(i)(j) - pic2(i-2)(j+1))
-            gradDR += abs(pic1(i)(j) - pic2(i+2)(j+1))
-            gradUL2 += abs(pic1(i)(j) - pic2(i-5)(j-2))
-            gradUR2 += abs(pic1(i)(j) - pic2(i+5)(j-2))
-            gradDL2 += abs(pic1(i)(j) - pic2(i-5)(j+2))
-            gradDR2 += abs(pic1(i)(j) - pic2(i+5)(j+2))
-        }
-        var gradsx = List(gradC, gradUL, gradUR, gradDL, gradDR, 
-            gradL1, gradR1, gradL2, gradR2, gradL3, gradR3, gradL4, gradR4, 
-            gradL5, gradR5, gradL6, gradR6, gradL7, gradR7,
-            gradUL, gradUR, gradDL, gradDR
-        ).zipWithIndex.minBy(_._1)._2
-        
-        var x = -(gradsx match {
-            case 0 =>  0
-            case 1 => -3
-            case 2 => +3
-            case 3 => -3
-            case 4 => +3
-            case 5 => -1
-            case 6 => +1
-            case 7 => -2
-            case 8 => +2
-            case 9 => -3
-            case 10=> +3
-            case 11=> -4
-            case 12=> +4
-            case 13=> -7
-            case 14=> +7
-            case 15=> -11
-            case 16=> +11
-            case 17=> -18
-            case 18=> +18
-            case 19=> -6
-            case 20=> +6
-            case 21=> -6
-            case 22=> +6
-        })        
-        
-        val p = MouseInfo.getPointerInfo.getLocation
-        if(x >= 6 || (ex >= 4 && x >= 2) || (ex >= 3 && x >= 1)) {
-            robot.keyPress(KeyEvent.VK_RIGHT)
-            //robot.mouseMove(p.x+x*5, p.y)
-        } else if(x <= -6 || (ex <= -4 && x <= -2) || (ex <= -3 && x <= -1)) {
-            robot.keyPress(KeyEvent.VK_LEFT)
-            //robot.mouseMove(p.x+x*5, p.y)
-        } else {
-            robot.keyRelease(KeyEvent.VK_RIGHT)
-            robot.keyRelease(KeyEvent.VK_LEFT)
-        }
+    val legalModes = Set("mouse", "keyboard", "keyboardx", "keyboardy", "output")
+    
+    val camIdReg = "-c([0-9]*)".r
+    val modeReg = "-m([0-9a-z]*)".r
+    val sizeReg = "-s([0-9]*)x([0-9]*)".r
+    args foreach {
+      case camIdReg(camId) => 
+        camIds = camIds :+ camId.toInt // additional indices used as fallback
+      case modeReg(mode) => 
+        modes += mode.toLowerCase
+        if(!legalModes.contains(mode.toLowerCase)) err.println(s"Unknown mode: $mode")
+      case sizeReg(width,height) => 
+        size = (width.toInt, height.toInt)
+      case a =>
+        actions += a
+    }
+    if(camIds.size==0) camIds = camIds :+ 0
+    if(modes.size==0) modes += "mouse"
 
-        ex = (ex + x)/2
+    val cam = withExit(
+      Camera.getCamera(camIds.toList, size._1, size._2).get,
+      err.println("Couldn't initialize any of the desired cameras.")
+    )
+    err.println(s"Initialized cam ${cam.camId} @ ${cam.width}x${cam.height}")
 
-        val swap = pic1
-        pic1 = pic2
-        pic2 = swap
-        captureFrame(pic2)
-        
-        print("\r" + x + "                 \t\t\t " + ("%1.2f" format avgtime) + "           \r")
-        avgtime = (since(tick)*0.2d + avgtime*0.8d)
-        tick = now
+    (cam, modes, actions)
+  }  
+
+  var robot: Robot = new Robot
+  var avgTime = 0d
+
+  var pic1 = Array.ofDim[Int](cam.width, cam.height)
+  var pic2 = Array.ofDim[Int](cam.width, cam.height)
+  cam.captureFrame(pic1)
+  cam.captureFrame(pic2)
+  var tick = now
+
+  val edge = 20 // TODO: resolution independant
+  var ex, ey = 0d
+  var cnt = 0
+  var x0, xt1,xt2,xt = 0d
+  var y0, yt1,yt2,yt = 0d
+  
+  var xcnt1,xcnt2 = 0
+  var ecnt1,ecnt2 = 0
+  var cntx0,cnty0 = 0
+
+  val noiseIters = 50
+  var noise = List[(Double,Double)]()
+  println("Be still for a few seconds :)")
+
+  var futurePic = future {}
+  var clickTime = now
+  while(true) {
+    val randPoints = ParArray.tabulate(200)(a=> 
+      (nextInt(cam.width-(edge+1)*2)+(edge+1), 
+      nextInt(cam.height-(edge+1)*2)+(edge+1))
+    )
+
+    def getPatch(x:Int, y:Int, pic:Array[Array[Int]]) = Array[Int](
+      pic(x-1)(y-1)/2, pic(x)(y-1), pic(x+1)(y-1)/2,
+      pic(x-1)(y),     pic(x)(y)*2, pic(x+1)(y),
+      pic(x-1)(y+1)/2, pic(x)(y+1), pic(x+1)(y+1)/2
+    )
+    val patchSize = 9
+    val patchRange = Array.range(0, patchSize)
+
+    Await.result(futurePic, Duration.Inf)
+
+    val vectors = randPoints map { case (x,y) =>
+      val exPatch = getPatch(x,y, pic1)
+      def comparePatches(patch:Array[Int]) = patchRange.foldLeft(0)((score, i) => score + abs(exPatch(i)-patch(i)))
+          
+      var minDist = inf
+      var minP = (0d,0d)
+      var i, j = -edge
+      do {
+        do {
+          val currDist = comparePatches(getPatch(x+i,y+j, pic2)) + sqrt(math.pow(i, 2) + math.pow(j, 2))*10
+          if(currDist < minDist) {
+            minDist = currDist
+            minP = (i,j)
+          }
+          i += 1
+        } while(i <= edge)
+        j += 1
+        i = -edge
+      } while(j <= edge)
+      
+      minP
     }
     
-    // cleanup
-    cam.stop
+    futurePic = future {
+      val swap = pic1
+      pic1 = pic2
+      pic2 = swap
+      cam.captureFrame(pic2)
+    }
+    
+    val (dx,dy) = {
+      val vecs = vectors.filter(a=> abs(a._1)+abs(a._2) >= 2)
+      val sum = vecs.foldLeft((0d,0d))((acc, v) => (acc._1+v._1, acc._2+v._2))
+      val avg = (sum._1/vecs.size, sum._2/vecs.size)
+      
+      val out = (avg._1*(avgTime*1.5), avg._2*(avgTime*2.5))
+      
+      if(cnt <= noiseIters) 
+          (-out._1, out._2)
+      else
+          (-out._1-x0, out._2-y0)
+    }    
+    
+    ex = (ex + dx)/2
+    ey = (ey + dy)/2
+    
+    if(cnt < noiseIters) {
+      noise = noise :+ (dx,dy)
+    } else if(cnt == noiseIters) {
+      def noiseAvg(m:((Double,Double))=>Double)(f:Double=>Boolean) = { 
+          val n = noise.map(m).filter(f)
+          n.sum/n.size
+      }
+      val noiseAvgx = noiseAvg(_._1) _
+      val noiseAvgy = noiseAvg(_._2) _
+      
+      x0 = noiseAvgx(x => true)
+      y0 = noiseAvgy(x => true)
+      xt1 = noiseAvgx(_ < x0) - x0
+      xt2 = noiseAvgx(_ > x0) - x0
+      yt1 = noiseAvgy(_ < y0) - y0
+      yt2 = noiseAvgy(_ > y0) - y0
+      xt = min(abs(xt1), abs(xt2))
+      yt = min(abs(yt1), abs(yt2))
+      
+      err.println(List(x0,y0,xt1,xt2,yt1,yt2).map(_.toInt).mkString(","))
+      //err.println("A bit more... :)")
+    } else if(cnt < noiseIters*2 && (actions contains "click")) {
+      xcnt1 += vectors.map(_._1).count(_ < xt1)
+      xcnt2 += vectors.map(_._1).count(_ > xt2)
+    } else if(cnt == noiseIters*2 && (actions contains "click")) {
+      xcnt1 /= noiseIters
+      xcnt2 /= noiseIters
+    } else if(cnt == noiseIters*2+1) {
+      ex = 0
+      ey = 0
+      err.println("Move now :)")
+    } else {
+      if(since(clickTime) > 400) {
+        def flipx(x:Int): Int = if((actions contains "flip") || (actions contains "flipx")) -x else x
+        def flipy(y:Int): Int = if((actions contains "flip") || (actions contains "flipy")) -y else y
+
+        modes foreach {
+          case "mouse" =>
+            val p = MouseInfo.getPointerInfo.getLocation
+            val sensitivity = 0.8 // 1 should remove almost all noise, higher values reduce sensitivity
+            var (vx,vy) = (
+              flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
+              flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt)
+            )
+            
+            if(actions contains "click") {
+              val cnt1 = vectors.map(_._1).count(_ < xt1)-xcnt1
+              val cnt2 = vectors.map(_._1).count(_ > xt2)-xcnt2
+              if(cnt1 >= 1 && cnt2 >= 1 && ecnt1 >= 2 && ecnt2 >= 2 && cnt1+cnt2+ecnt1+ecnt2 >= 6 && abs(ecnt1-ecnt2) <= 5 && since(clickTime) > 700) {
+                println
+                robot.mouseMove(cntx0, cnty0)
+                ex = 0
+                ey = 0
+                robot.mousePress(InputEvent.BUTTON1_MASK)
+                sleep(10)
+                robot.mouseRelease(InputEvent.BUTTON1_MASK)
+                clickTime = now
+                println
+              } else if(cnt1+cnt2 <= 1) {
+                val p = MouseInfo.getPointerInfo.getLocation
+                cntx0 = p.x
+                cnty0 = p.y
+              }
+              ecnt1 = cnt1
+              ecnt2 = cnt2
+            }
+            robot.mouseMove(p.x+vx, p.y+vy)
+            
+          case str @ ("keyboard" | "keyboardx"  | "keyboardy") =>
+            val sensitivity = 1.75 // 1 should remove almost all noise, higher values reduce sensitivity
+            var (vx,vy) = (
+              flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
+              flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt)
+            )
+            def key(cond: Boolean, key: Int) = if(cond) robot.keyPress(key) else robot.keyRelease(key)
+            val lim = 3
+            if(!str.endsWith("y")) {
+              key(vx > +lim, KeyEvent.VK_RIGHT)
+              key(vx < -lim, KeyEvent.VK_LEFT)
+            }
+            if(!str.endsWith("x")) {
+              key(vy > +lim, KeyEvent.VK_DOWN)
+              key(vy < -lim, KeyEvent.VK_UP)
+            }
+            
+          case "output" =>
+            val sensitivity = 1.0 // 1 should remove almost all noise, higher values reduce sensitivity
+            var (vx,vy) = (
+              flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
+              flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt)
+            )
+            println(vx+" "+vy)
+        }
+      }
+    }
+
+    cnt += 1
+    //err.print("\r" + (pad(x.toInt),pad(y.toInt)) + (pad(cnt1.toInt),pad(cnt2.toInt)) + "                 \t\t\t " + ("%1.2f" format avgTime) + "           \r")
+    err.print("\r" + ("%1.2f" format avgTime) + "             \r")
+    avgTime = (since(tick)*0.2d + avgTime*0.8d)
+    tick = now
+  }  
 }

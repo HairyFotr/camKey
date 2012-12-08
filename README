@@ -2,25 +2,20 @@
  camKey
 --------
 
-Just a fun experiment - using the camera to control a game (e.g. https://github.com/Psywerx/game-off-2012)
-When you move left or right, the program generates key presses and mouse movements.
+Just a fun experiment - using a camera to control apps and games.
+When you move, the program generates key presses and/or mouse movements.
+Tested on https://github.com/Psywerx/game-off-2012 and a few racing games.
 
 How to install:
-    have Scala, possibly 2.10 in your path
-    if you don't have a 64-bit linux and java, get the correct javacv jar
-    sudo apt-get install libopencv-core2.3 libopencv-core-dev libavcodec53 libavcodec-dev libavformat53 libavformat-dev
-    if it says you don't have opencv 2.4, you can do this horrible thing at your own risk:
-        for aaa in /usr/lib/libopencv_*2.3; do sudo ln -s $aaa ${aaa%????}.2.4; done
-
-How to use:
-    ./run camKey # no switches yet :)
-    when there is left/right movement, left/right keys are pressed
+    Have Scala (possibly 2.10) in your path.
+    If you don't have a 64-bit linux and java, get the correct javacv jar.
+    Install these:
+      sudo apt-get install libopencv-core2.3 libopencv-core-dev libavcodec53 
+      sudo apt-get install libavcodec-dev libavformat53 libavformat-dev
+    If you don't have opencv 2.4, do this horrible thing at your own risk:
+      for aaa in /usr/lib/libopencv_*2.3; do sudo ln -s $aaa ${aaa%????}.2.4; done
+    If it works slow, decrease edge variable, and try changing sensitivity.
+    (sorry, too lazy to make these two into proper switches right now :))
     
-    or
-    
-    ./run camMouse # switches: click
-    hold still while it grabs some frames to tune a few parameters...
-    movement now controls the mouse
-
 Libraries used:
     JavaCV - http://code.google.com/p/javacv/

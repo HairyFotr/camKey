@@ -14,8 +14,8 @@ import System.err
 object Utils {
   var timeDivisor = 1000000L
   def since(time: Int): Int = now-time
-  def now = (System.nanoTime()/timeDivisor).toInt
-  def time(func: => Unit) = {
+  def now: Int = (System.nanoTime()/timeDivisor).toInt
+  def time(func: => Unit): Int = {
     val startTime = now
     func
     now-startTime
@@ -24,8 +24,7 @@ object Utils {
   def pad(i: Int, p: Int = 4) = "0"*(p-i.toString.size)+i.toString
   val (inf,ninf) = (Double.PositiveInfinity, Double.NegativeInfinity)
 
-  def withDefault[T](func: => T, default: T): T = try { func } catch { case _: Throwable => default}
-  def withAlternative[T](func: => T, alternative: => T ): T = try { func } catch { case _: Throwable => alternative}
+  def withDefault[T](func: => T, default: => T ): T = try { func } catch { case _: Throwable => default}
   def withExit[T](func: => T, exit: => Any = { }): T = try { func } catch { case _: Throwable => exit; sys.exit(-1) }
  
   import com.googlecode.javacv._
@@ -55,7 +54,7 @@ object Utils {
         Some(cam)
       } catch {
         case e: Exception => 
-        err.println(s"Failed to initialize camera ${camId} @ ${width}x${height}")
+        err.println("Failed to initialize camera "+camId+" @ "+width+"x"+height)
         None
       }
     }
@@ -65,7 +64,7 @@ object Utils {
   }
   class Camera(val camId: Int = 0, val width: Int = 640, val height: Int = 480) {
     var camOpt: Option[OpenCVFrameGrabber] = Camera.getFrameGrabber(camId, width, height)
-    def isStarted = camOpt.isDefined
+    def isStarted: Boolean = camOpt.isDefined
     lazy val cam = camOpt.get
     lazy val grabRange = (0 until width*height)
     
@@ -88,7 +87,7 @@ object camKey extends App {
   
   // parse switches
   val (cam, modes, actions) = {
-    var camIds = List[Int]()
+    val camIds = ListBuffer[Int]()
     val modes = HashSet[String]()
     val actions = HashSet[String]()
     var size = (640,480)
@@ -116,23 +115,23 @@ object camKey extends App {
     val sizeReg = "-s([0-9]*)x([0-9]*)".r
     args foreach {
       case camIdReg(camId) => 
-        camIds = camIds :+ camId.toInt // additional indices used as fallback
+        camIds += camId.toInt // additional indices used as fallback
       case modeReg(mode) => 
         modes += mode.toLowerCase
-        if(!legalModes.contains(mode.toLowerCase)) err.println(s"Unknown mode: $mode")
+        if(!legalModes.contains(mode.toLowerCase)) err.println("Unknown mode: "+mode)
       case sizeReg(width,height) => 
         size = (width.toInt, height.toInt)
       case a =>
         actions += a
     }
-    if(camIds.size==0) camIds = camIds :+ 0
-    if(modes.size==0) modes += "mouse"
+    if(camIds.isEmpty) camIds += 0
+    if(modes.isEmpty) modes += "mouse"
 
     val cam = withExit(
       Camera.getCamera(camIds.toList, size._1, size._2).get,
       err.println("Couldn't initialize any of the desired cameras.")
     )
-    err.println(s"Initialized cam ${cam.camId} @ ${cam.width}x${cam.height}")
+    err.println("Initialized cam "+cam.camId+" @ "+cam.width+"x"+cam.height)
 
     (cam, modes, actions)
   }  
@@ -163,9 +162,9 @@ object camKey extends App {
   var futurePic = future {}
   var clickTime = now
   while(true) {
-    val randPoints = ParArray.tabulate(200)(a=> 
+    val randPoints = ParArray.tabulate(200)(a => 
       (nextInt(cam.width-(edge+1)*2)+(edge+1), 
-      nextInt(cam.height-(edge+1)*2)+(edge+1))
+       nextInt(cam.height-(edge+1)*2)+(edge+1))
     )
 
     def getPatch(x:Int, y:Int, pic:Array[Array[Int]]) = Array[Int](
@@ -180,7 +179,7 @@ object camKey extends App {
 
     val vectors = randPoints map { case (x,y) =>
       val exPatch = getPatch(x,y, pic1)
-      def comparePatches(patch:Array[Int]) = patchRange.foldLeft(0)((score, i) => score + abs(exPatch(i)-patch(i)))
+      def comparePatches(patch:Array[Int]): Int = patchRange.foldLeft(0)((score, i) => score + abs(exPatch(i)-patch(i)))
           
       var minDist = inf
       var minP = (0d,0d)
@@ -209,16 +208,17 @@ object camKey extends App {
     }
     
     val (dx,dy) = {
-      val vecs = vectors.filter(a=> abs(a._1)+abs(a._2) >= 2)
+      val vecs = vectors.filter(a => abs(a._1)+abs(a._2) >= 2)
       val sum = vecs.foldLeft((0d,0d))((acc, v) => (acc._1+v._1, acc._2+v._2))
       val avg = (sum._1/vecs.size, sum._2/vecs.size)
       
       val out = (avg._1*(avgTime*1.5), avg._2*(avgTime*2.5))
       
-      if(cnt <= noiseIters) 
-          (-out._1, out._2)
-      else
-          (-out._1-x0, out._2-y0)
+      if(cnt <= noiseIters) {
+        (-out._1, out._2)
+      } else {
+        (-out._1-x0, out._2-y0)
+      }
     }    
     
     ex = (ex + dx)/2
@@ -227,7 +227,7 @@ object camKey extends App {
     if(cnt < noiseIters) {
       noise = noise :+ (dx,dy)
     } else if(cnt == noiseIters) {
-      def noiseAvg(m:((Double,Double))=>Double)(f:Double=>Boolean) = { 
+      def noiseAvg(m: ((Double, Double)) => Double)(f: Double => Boolean): Double = { 
           val n = noise.map(m).filter(f)
           n.sum/n.size
       }
@@ -321,7 +321,7 @@ object camKey extends App {
     }
 
     cnt += 1
-    //err.print("\r" + (pad(x.toInt),pad(y.toInt)) + (pad(cnt1.toInt),pad(cnt2.toInt)) + "                 \t\t\t " + ("%1.2f" format avgTime) + "           \r")
+    //err.print("\r" + (pad(x.toInt),pad(y.toInt)) + (pad(cnt1.toInt),pad(cnt2.toInt)) + "               \t\t\t " + ("%1.2f" format avgTime) + "         \r")
     err.print("\r" + ("%1.2f" format avgTime) + "             \r")
     avgTime = (since(tick)*0.2d + avgTime*0.8d)
     tick = now

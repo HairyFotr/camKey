@@ -3,5 +3,5 @@ jars() { for j in *.jar; do echo -n $j:; done; }
 mkdir bin &> /dev/null
 app="camKey"
 
-scalac -d bin -cp `jars` $app.scala && 
+scalac -optimise -Ywarn-adapted-args -Ywarn-all -Ywarn-dead-code -Ywarn-inaccessible -Ywarn-nullary-override -Ywarn-nullary-unit -Ywarn-value-discard -Xlint -deprecation -feature -unchecked -d bin -cp `jars` $app.scala && 
 scala -cp bin:`jars` $app $@

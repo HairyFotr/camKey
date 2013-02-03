@@ -68,7 +68,7 @@ object Utils {
     lazy val cam = camOpt.get
     lazy val grabRange = (0 until width*height)
     
-    def captureFrame(pixels:Array[Array[Int]]): Unit = {
+    def captureFrame(pixels:Array[Array[Int]]) {
       Option(cam.grab) foreach { img =>
         val imgData = img.getBufferedImage.getData.getDataBuffer.asInstanceOf[java.awt.image.DataBufferByte] //surely there's an easier way
         for(i <- grabRange) 

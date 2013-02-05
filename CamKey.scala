@@ -34,9 +34,9 @@ object Utils {
     val FrameGrabbers = HashMap[Int, OpenCVFrameGrabber]()
     
     def getCamera(camIds: List[Int], width: Int = 640, height: Int = 480): Option[Camera] = {
-      for (camId <- camIds) {
+      for(camId <- camIds) {
         val out = Camera(camId, width, height)
-        if (out.isStarted) return Some(out)
+        if(out.isStarted) return Some(out)
       }
       
       None
@@ -70,7 +70,7 @@ object Utils {
     def captureFrame(pixels: Array[Array[Int]]) {
       Option(cam.grab) foreach { img =>
         val imgData = img.getBufferedImage.getData.getDataBuffer.asInstanceOf[java.awt.image.DataBufferByte] //surely there's an easier way
-        for (i <- grabRange) {
+        for(i <- grabRange) {
           pixels(i%width)(i/width) = (
             imgData.getElem(i*3 + 0).toInt +
             imgData.getElem(i*3 + 1).toInt +
@@ -91,7 +91,7 @@ object CamKey extends App {
     val actions = HashSet[String]()
     var size = (640,480)
     
-    if (args exists (_ matches "-?-?help")) {
+    if(args exists (_ matches "-?-?help")) {
       println("""|Usage: -c[CAMID] -m[MODE] -s[WIDTHxHEIGHT] [OPTIONS]
                  |
                  |Allows you to control your keyboard or mouse with your camera.
@@ -117,14 +117,14 @@ object CamKey extends App {
         camIds += camId.toInt // additional indices used as fallback
       case modeReg(mode) => 
         modes += mode.toLowerCase
-        if (!legalModes.contains(mode.toLowerCase)) err.println("Unknown mode: "+mode)
+        if(!legalModes.contains(mode.toLowerCase)) err.println("Unknown mode: "+mode)
       case sizeReg(width,height) => 
         size = (width.toInt, height.toInt)
-      case a =>
-        actions += a
+      case action =>
+        actions += action
     }
-    if (camIds.isEmpty) camIds += 0
-    if (modes.isEmpty) modes += "mouse"
+    if(camIds.isEmpty) camIds += 0
+    if(modes.isEmpty) modes += "mouse"
 
     val cam = withExit(
       Camera.getCamera(camIds.toList, size._1, size._2).get,
@@ -159,7 +159,7 @@ object CamKey extends App {
 
   var futurePic = future {}
   var clickTime = now
-  while (true) {
+  while(true) {
     val randPoints = ParArray.tabulate(200) { _ =>
       (nextInt(cam.width-(edge+1)*2)+(edge+1), 
       nextInt(cam.height-(edge+1)*2)+(edge+1))
@@ -186,15 +186,15 @@ object CamKey extends App {
       do {
         do {
           val currDist = comparePatches(getPatch(x+i,y+j, pic2)) + sqrt(math.pow(i, 2) + math.pow(j, 2))*10
-          if (currDist < minDist) {
+          if(currDist < minDist) {
             minDist = currDist
             minP = (i,j)
           }
           i += 1
-        } while (i <= edge)
+        } while(i <= edge)
         j += 1
         i = -edge
-      } while (j <= edge)
+      } while(j <= edge)
       
       minP
     }
@@ -207,13 +207,13 @@ object CamKey extends App {
     }
     
     val (dx,dy) = {
-      val vecs = vectors.filter(a => abs(a._1)+abs(a._2) >= 2)
-      val sum = vecs.foldLeft((0d,0d))((acc, v) => (acc._1+v._1, acc._2+v._2))
+      val vecs = vectors.filter(vec => abs(vec._1)+abs(vec._2) >= 2)
+      val sum = vecs.foldLeft((0d,0d))((acc, vec) => (acc._1+vec._1, acc._2+vec._2))
       val avg = (sum._1/vecs.size, sum._2/vecs.size)
       
       val out = (avg._1*(avgTime*1.5), avg._2*(avgTime*2.5))
       
-      if (cnt <= noiseIters) {
+      if(cnt <= noiseIters) {
         (-out._1, out._2)
       } else {
         (-out._1-x0, out._2-y0)
@@ -223,9 +223,9 @@ object CamKey extends App {
     ex = (ex + dx)/2
     ey = (ey + dy)/2
     
-    if (cnt < noiseIters) {
+    if(cnt < noiseIters) {
       noise = noise :+ (dx,dy)
-    } else if (cnt == noiseIters) {
+    } else if(cnt == noiseIters) {
       def noiseAvg(m: ((Double, Double)) => Double)(f: Double => Boolean): Double = { 
           val n = noise.map(m).filter(f)
           n.sum/n.size
@@ -244,33 +244,33 @@ object CamKey extends App {
       
       err.println(List(x0,y0,xt1,xt2,yt1,yt2).map(_.toInt).mkString(","))
       //err.println("A bit more... :)")
-    } else if (cnt < noiseIters*2 && (actions contains "click")) {
+    } else if(cnt < noiseIters*2 && (actions contains "click")) {
       xcnt1 += vectors.map(_._1).count(_ < xt1)
       xcnt2 += vectors.map(_._1).count(_ > xt2)
-    } else if (cnt == noiseIters*2 && (actions contains "click")) {
+    } else if(cnt == noiseIters*2 && (actions contains "click")) {
       xcnt1 /= noiseIters
       xcnt2 /= noiseIters
-    } else if (cnt == noiseIters*2 + 1) {
+    } else if(cnt == noiseIters*2 + 1) {
       ex = 0
       ey = 0
       err.println("Move now :)")
     } else {
-      if (since(clickTime) > 400) {
-        def flipx(x: Int): Int = if ((actions contains "flip") || (actions contains "flipx")) -x else x
-        def flipy(y: Int): Int = if ((actions contains "flip") || (actions contains "flipy")) -y else y
+      if(since(clickTime) > 400) {
+        def flipx(x: Int): Int = if((actions contains "flip") || (actions contains "flipx")) -x else x
+        def flipy(y: Int): Int = if((actions contains "flip") || (actions contains "flipy")) -y else y
 
         modes foreach {
           case "mouse" =>
             val p = MouseInfo.getPointerInfo.getLocation
             val sensitivity = 0.8 // 1 should remove almost all noise, higher values reduce sensitivity
             var (vx,vy) = (
-              flipx(if (ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
-              flipy(if (ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
+              flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
+              flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
             
-            if (actions contains "click") {
+            if(actions contains "click") {
               val cnt1 = vectors.map(_._1).count(_ < xt1)-xcnt1
               val cnt2 = vectors.map(_._1).count(_ > xt2)-xcnt2
-              if (cnt1 >= 1 && cnt2 >= 1 && ecnt1 >= 2 && ecnt2 >= 2 && cnt1+cnt2+ecnt1+ecnt2 >= 6 && abs(ecnt1-ecnt2) <= 5 && since(clickTime) > 700) {
+              if(cnt1 >= 1 && cnt2 >= 1 && ecnt1 >= 2 && ecnt2 >= 2 && cnt1+cnt2+ecnt1+ecnt2 >= 6 && abs(ecnt1-ecnt2) <= 5 && since(clickTime) > 700) {
                 println
                 robot.mouseMove(cntx0, cnty0)
                 ex = 0
@@ -280,7 +280,7 @@ object CamKey extends App {
                 robot.mouseRelease(InputEvent.BUTTON1_MASK)
                 clickTime = now
                 println
-              } else if (cnt1+cnt2 <= 1) {
+              } else if(cnt1+cnt2 <= 1) {
                 val p = MouseInfo.getPointerInfo.getLocation
                 cntx0 = p.x
                 cnty0 = p.y
@@ -293,19 +293,19 @@ object CamKey extends App {
           case str @ ("keyboard" | "keyboardx"  | "keyboardy") =>
             val sensitivity = 1.75 // 1 should remove almost all noise, higher values reduce sensitivity
             var (vx,vy) = (
-              flipx(if (ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
-              flipy(if (ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
+              flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
+              flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
               
             def key(cond: Boolean, key: Int) {
-              if (cond) robot.keyPress(key) else robot.keyRelease(key)
+              if(cond) robot.keyPress(key) else robot.keyRelease(key)
             }
             
             val lim = 3
-            if (!str.endsWith("y")) {
+            if(!str.endsWith("y")) {
               key(vx > +lim, KeyEvent.VK_RIGHT)
               key(vx < -lim, KeyEvent.VK_LEFT)
             }
-            if (!str.endsWith("x")) {
+            if(!str.endsWith("x")) {
               key(vy > +lim, KeyEvent.VK_DOWN)
               key(vy < -lim, KeyEvent.VK_UP)
             }
@@ -313,8 +313,8 @@ object CamKey extends App {
           case "output" =>
             val sensitivity = 1.0 // 1 should remove almost all noise, higher values reduce sensitivity
             var (vx,vy) = (
-              flipx(if (ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
-              flipy(if (ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
+              flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
+              flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
               
             println(vx+" "+vy)
         }

@@ -8,14 +8,29 @@ Tested on https://github.com/Psywerx/game-off-2012 and a few racing games.
 
 How to install:
     Have Scala (possibly 2.10) in your path.
-    If you don't have a 64-bit linux and java, get the correct javacv jar.
-    Install these:
-      sudo apt-get install libopencv-core2.3 libopencv-core-dev libavcodec53 
-      sudo apt-get install libavcodec-dev libavformat53 libavformat-dev
-    If you don't have opencv 2.4, do this horrible thing at your own risk:
-      for aaa in /usr/lib/libopencv_*2.3; do sudo ln -s $aaa ${aaa%????}.2.4; done
-    If it works slow, decrease edge variable, and try changing sensitivity.
-    (sorry, too lazy to make these two into proper switches right now :))
+    
+    Linux:
+      If you don't have a 64-bit linux and java:
+        get the correct javacv jar
+        fix the classpath in ./run
+      Install these: (Note: the cppjars from javacv might work too - didn't test)
+        sudo apt-get install libopencv-core2.3 libopencv-core-dev libavcodec53 
+        sudo apt-get install libavcodec-dev libavformat53 libavformat-dev
+      If you don't have opencv 2.4 packs, do this horrible thing at your own risk:
+        for aaa in /usr/lib/libopencv_*2.3; do sudo ln -s $aaa ${aaa%????}.2.4; done
+        It will break when you update/reinstall OpenCV, and is a very ugly hack
+      Run ./run
+
+    Windows:
+      If you don't have a 64-bit windows and java:
+        get the correct javacv jar
+        fix the classpath in run.bat
+      Get the cppjars from javacv downloads and add them to classpath in run.bat
+        (I don't have the acces to the system where I got it to work - remind me)
+      Run run.bat
+
+    If it works slow, decrease edge variable, and/or try changing sensitivity.
+    (sorry, too lazy to make these two into proper switches/files right now :))
     
 Libraries used:
     JavaCV - http://code.google.com/p/javacv/

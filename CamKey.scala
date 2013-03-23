@@ -261,7 +261,7 @@ object CamKey extends App {
 
         modes foreach {
           case "mouse" =>
-            val p = MouseInfo.getPointerInfo.getLocation
+            val mouse = MouseInfo.getPointerInfo.getLocation
             val sensitivity = 0.8 // 1 should remove almost all noise, higher values reduce sensitivity
             var (vx,vy) = (
               flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
@@ -281,14 +281,13 @@ object CamKey extends App {
                 clickTime = now
                 println
               } else if(cnt1+cnt2 <= 1) {
-                val p = MouseInfo.getPointerInfo.getLocation
-                cntx0 = p.x
-                cnty0 = p.y
+                cntx0 = mouse.x
+                cnty0 = mouse.y
               }
               ecnt1 = cnt1
               ecnt2 = cnt2
             }
-            robot.mouseMove(p.x+vx, p.y+vy)
+            robot.mouseMove(mouse.x+vx, mouse.y+vy)
             
           case str @ ("keyboard" | "keyboardx"  | "keyboardy") =>
             val sensitivity = 1.75 // 1 should remove almost all noise, higher values reduce sensitivity

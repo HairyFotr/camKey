@@ -12,7 +12,7 @@ import ExecutionContext.Implicits.global
 import System.err
 
 object Utils {
-  var timeDivisor = 1000000L
+  val timeDivisor = 1000000L
   def since(time: Int): Int = now-time
   def now: Int = (System.nanoTime()/timeDivisor).toInt
   def time(func: => Unit): Int = {
@@ -62,7 +62,7 @@ object Utils {
     }
   }
   class Camera(val camId: Int = 0, val width: Int = 640, val height: Int = 480) {
-    var camOpt: Option[OpenCVFrameGrabber] = Camera.getFrameGrabber(camId, width, height)
+    val camOpt: Option[OpenCVFrameGrabber] = Camera.getFrameGrabber(camId, width, height)
     def isStarted: Boolean = camOpt.isDefined
     lazy val cam = camOpt.get
     lazy val grabRange = (0 until width*height)
@@ -135,7 +135,7 @@ object CamKey extends App {
     (cam, modes, actions)
   }
 
-  var robot: Robot = new Robot
+  val robot: Robot = new Robot
   var avgTime = 0d
 
   var pic1, pic2 = Array.ofDim[Int](cam.width, cam.height)

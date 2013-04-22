@@ -263,7 +263,7 @@ object CamKey extends App {
           case "mouse" =>
             val mouse = MouseInfo.getPointerInfo.getLocation
             val sensitivity = 0.8 // 1 should remove almost all noise, higher values reduce sensitivity
-            var (vx,vy) = (
+            val (vx,vy) = (
               flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
               flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
             
@@ -291,7 +291,7 @@ object CamKey extends App {
             
           case str @ ("keyboard" | "keyboardx"  | "keyboardy") =>
             val sensitivity = 1.75 // 1 should remove almost all noise, higher values reduce sensitivity
-            var (vx,vy) = (
+            val (vx,vy) = (
               flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
               flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
               
@@ -311,7 +311,7 @@ object CamKey extends App {
             
           case "output" =>
             val sensitivity = 1.0 // 1 should remove almost all noise, higher values reduce sensitivity
-            var (vx,vy) = (
+            val (vx,vy) = (
               flipx(if(ex < 0) -pow(ex/(xt1*sensitivity), 1.6).toInt else pow(ex/(xt2*sensitivity), 1.6).toInt),
               flipy(if(ey < 0) -pow(ey/(yt1*sensitivity), 2).toInt else pow(ey/(yt2*sensitivity), 2).toInt))
               

@@ -7,7 +7,7 @@ When you move, the program generates key presses and/or mouse movements.
 Tested on https://github.com/Psywerx/game-off-2012 and a few racing games.
 
 How to install:
-    Have Scala (possibly 2.10) in your path.
+    Have Scala (possibly 2.10 or 2.11) in your path.
     
     Linux:
       If you don't have a 64-bit linux and java:
@@ -26,10 +26,10 @@ How to install:
         get the correct javacv jar
         fix the classpath in run.bat
       Get the cppjars from javacv downloads and add them to classpath in run.bat
-        (I don't have the acces to the system where I got it to work - remind me)
+        (I don't have the access to the system where I got it to work)
       Run run.bat
 
-    If it works slow, decrease edge variable, and/or try changing sensitivity.
+    If it works slow, decrease the edge variable, and/or try changing sensitivity.
     (sorry, too lazy to make these two into proper switches/files right now :))
     
 Libraries used:

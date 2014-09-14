@@ -2,5 +2,5 @@ mkdir bin &> /dev/null
 app="CamKey"
 jars="javacv.jar:javacpp.jar:javacv-linux-x86_64.jar"
 
-scalac $SCALA_PLUGINS -optimise -Ywarn-adapted-args -Ywarn-all -Ywarn-dead-code -Ywarn-inaccessible -Ywarn-nullary-override -Ywarn-nullary-unit -Ywarn-value-discard -Xlint -deprecation -feature -unchecked -d bin -cp $jars $app.scala && 
+scalac $SCALA_PLUGINS -optimise -Ywarn-adapted-args -Ywarn-dead-code -Ywarn-inaccessible -Ywarn-nullary-override -Ywarn-nullary-unit -Ywarn-value-discard -Xlint -deprecation -feature -unchecked -d bin -cp $jars $app.scala && 
 scala -cp bin:$jars $app $@
